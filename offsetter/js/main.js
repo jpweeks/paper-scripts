@@ -167,8 +167,8 @@ Offsetter.prototype = {
 
 	// UI
 	onMouseDown: function (event) {
-		var handle;
 		var hitResult = this.sources.hitTest(event.point, this.hitOpts);
+		var path, handle;
 
 		if (hitResult) {
 			path = hitResult.segment.path;
@@ -188,8 +188,8 @@ Offsetter.prototype = {
 			}
 		}
 
-		this.selectedHandle = handle;
 		this.selectedPath = path;
+		this.selectedHandle = handle;
 	},
 
 	onMouseDrag: function (event) {

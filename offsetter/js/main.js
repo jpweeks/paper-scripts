@@ -2,13 +2,12 @@
 // Offsetter
 // ---------
 
-var Offsetter = function (sources, iterations, fillView) {
-	this.items = new Group();
+var Offsetter = function (sources, opts) {
 	this.sources = new Group(sources);
-	this.items.addChild(this.sources);
+	this.items = new Group(this.sources);
 
 	this.sources.selected = true;
-	this.iterations = iterations;
+	this.iterations = opts.iterations;
 
 	this.setupGroups();
 	this.update();
@@ -18,7 +17,7 @@ var Offsetter = function (sources, iterations, fillView) {
 	tool.on("mousedown", this.onMouseDown.bind(this));
 	tool.on("mousedrag", this.onMouseDrag.bind(this));
 
-	if (fillView) {
+	if (opts.fillView) {
 		view.on("resize", this.resize.bind(this));
 	}
 };
@@ -203,31 +202,63 @@ Offsetter.prototype = {
 // Scene
 // -----
 
-var paths = [
-	new Path([
-		[0.05, 0.05],
-		[0.12, 0.5],
-		[0.01, 0.75],
-		[0.1, 0.95]
-	]),
+new Offsetter([
 
-	new Path([
+	new Path(
+		[0, 0],
+		[0, 1]
+	),
+
+	new Path(
+		[0.07, 0.05],
+		[0.12, 0.5],
+		[0.08, 0.75],
+		[0.1, 0.95]
+	),
+
+	new Path(
 		[0.25, 0.05],
 		[0.22, 0.5],
 		[0.21, 0.95]
-	]),
+	),
 
-	new Path([
+	new Path(
+		[0.33, 0.05],
+		[0.28, 0.5],
+		[0.32, 0.8],
+		[0.3, 0.98]
+	),
+
+	new Path(
 		[0.45, 0.05],
 		[0.52, 0.15],
 		[0.48, 0.25],
 		[0.62, 0.35],
 		[0.41, 0.95]
-	])
-];
+	),
 
-var offsets = new Offsetter(paths, 20, true);
+	new Path(
+		[0.75, 0.05],
+		[0.82, 0.15],
+		[0.62, 0.85],
+		[0.71, 0.95]
+	),
 
+	new Path(
+		[0.85, 0.01],
+		[0.9, 0.12],
+		[0.82, 0.35],
+		[0.79, 0.9]
+	),
 
+	new Path(
+		[1, 0],
+		[1, 1]
+	)
+
+], {
+	iterations: 20,
+	fillView: true
+});
 
 

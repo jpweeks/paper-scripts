@@ -40,24 +40,28 @@ Offsetter.prototype = {
 		var iterations = this.iterations;
 
 		var groups = this.groups = [];
-		var pathA, pathB, paths;
+		var pathA, pathB, paths, data;
 
 		for (var i = 0, il = sources.length - 1; i < il; i ++) {
 			pathA = sources[i];
 			pathB = sources[i + 1];
 			paths = new Group();
 
+
 			for (var j = 0; j < iterations; j ++) {
 				paths.addChild(new Path());
 			}
 
-			items.addChild(paths);
-			groups.push({
+			data = {
 				a: pathA,
 				b: pathB,
 				pairs: null,
 				paths: paths
-			});
+			};
+
+			items.addChild(paths);
+			pathA.groupB = pathB.groupA = data;
+			groups.push(data);
 		}
 	},
 
@@ -125,6 +129,8 @@ Offsetter.prototype = {
 	}()),
 
 	updateGroup: function (group) {
+		if (!group) { return; }
+
 		var iterations = this.iterations;
 		var paths = group.paths.children;
 
@@ -164,6 +170,8 @@ Offsetter.prototype = {
 		var hitResult = this.sources.hitTest(event.point, this.hitOpts);
 
 		if (hitResult) {
+			path = hitResult.segment.path;
+
 			switch (hitResult.type) {
 			case "handle-in":
 				handle = hitResult.segment.handleIn;
@@ -179,17 +187,20 @@ Offsetter.prototype = {
 			}
 		}
 
-		this.handle = handle;
+		this.selectedHandle = handle;
+		this.selectedPath = path;
 	},
 
 	onMouseDrag: function (event) {
-		var handle = this.handle;
+		var path = this.selectedPath;
+		var handle = this.selectedHandle;
 
 		if (handle) {
 			handle.x += event.delta.x;
 			handle.y += event.delta.y;
 
-			this.update();
+			this.updateGroup(path.groupA);
+			this.updateGroup(path.groupB);
 		}
 	},
 

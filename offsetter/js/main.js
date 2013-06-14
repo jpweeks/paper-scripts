@@ -6,14 +6,14 @@ var Offsetter = function (sources, iterations) {
 	this.sources = new Group(sources);
 	this.sources.style = this.style;
 	this.sources.selected = true;
-
 	this.iterations = iterations;
-	this.groups = this.setupGroups();
 
+	this.setupGroups();
 	this.update();
 
 	tool.on("mousedown", this.onMouseDown.bind(this));
 	tool.on("mousedrag", this.onMouseDrag.bind(this));
+	view.on("resize", this.resize.bind(this));
 };
 
 Offsetter.prototype = {
@@ -31,7 +31,9 @@ Offsetter.prototype = {
 	setupGroups: function () {
 		var sources = this.sources.children;
 		var iterations = this.iterations;
-		var groups = [];
+
+		var groups = this.groups = new Group();
+		var groupData = this.groupData = [];
 		var pathA, pathB, paths;
 
 		for (var i = 0, il = sources.length - 1; i < il; i ++) {
@@ -43,8 +45,8 @@ Offsetter.prototype = {
 				paths.addChild(new Path());
 			}
 
-			paths.style = this.style;
-			groups.push({
+			groups.addChild(paths);
+			groupData.push({
 				a: pathA,
 				b: pathB,
 				pairs: null,
@@ -52,7 +54,7 @@ Offsetter.prototype = {
 			});
 		}
 
-		return groups;
+		this.groups.style = this.style;
 	},
 
 	// Compare two paths, pairing their segments by proximity
@@ -146,9 +148,9 @@ Offsetter.prototype = {
 	},
 
 	update: function () {
-		var groups = this.groups;
-		for (var i = 0, il = groups.length; i < il; i ++) {
-			this.updateGroup(groups[i]);
+		var groupData = this.groupData;
+		for (var i = 0, il = groupData.length; i < il; i ++) {
+			this.updateGroup(groupData[i]);
 		}
 	},
 
@@ -185,6 +187,12 @@ Offsetter.prototype = {
 
 			this.update();
 		}
+	},
+
+	resize: function (event) {
+		var size = view.size;
+		this.sources.fitBounds(size);
+		this.groups.fitBounds(size);
 	}
 
 };
@@ -192,28 +200,22 @@ Offsetter.prototype = {
 // Scene
 // -----
 
-var pathA = new Path([
-	[100, 0],
-	[30, 90],
-	[100, 120],
-	[150, 400]
-]);
+var paths = [
+	new Path([
+		[0.05, 0.05],
+		[0.12, 0.5],
+		[0.1, 0.95]
+	]),
 
-var pathB = new Path([
-	[400, 10],
-	[420, 300],
-	[410, 350],
-	[380, 420]
-]);
+	new Path([
+		[0.25, 0.05],
+		[0.22, 0.5],
+		[0.21, 0.95]
+	])
+];
 
-var pathC = new Path([
-	[600, 10],
-	[620, 300],
-	[610, 350],
-	[640, 370],
-	[580, 420]
-]);
+var offsets = new Offsetter(paths, 20);
 
-var offsets = new Offsetter([pathA, pathB, pathC], 20);
+
 
 

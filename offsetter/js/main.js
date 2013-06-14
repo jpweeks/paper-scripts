@@ -29,6 +29,7 @@ Offsetter.prototype = {
 	},
 
 	hitOpts: {
+		tolerance: 15,
 		selected: true,
 		segments: true,
 		handles: true

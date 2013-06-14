@@ -2,18 +2,25 @@
 // Offsetter
 // ---------
 
-var Offsetter = function (sources, iterations) {
+var Offsetter = function (sources, iterations, fillView) {
+	this.items = new Group();
 	this.sources = new Group(sources);
-	this.sources.style = this.style;
+	this.items.addChild(this.sources);
+
 	this.sources.selected = true;
 	this.iterations = iterations;
 
 	this.setupGroups();
 	this.update();
 
+	this.items.style = this.style;
+
 	tool.on("mousedown", this.onMouseDown.bind(this));
 	tool.on("mousedrag", this.onMouseDrag.bind(this));
-	view.on("resize", this.resize.bind(this));
+
+	if (fillView) {
+		view.on("resize", this.resize.bind(this));
+	}
 };
 
 Offsetter.prototype = {
@@ -29,11 +36,11 @@ Offsetter.prototype = {
 	},
 
 	setupGroups: function () {
+		var items = this.items;
 		var sources = this.sources.children;
 		var iterations = this.iterations;
 
-		var groups = this.groups = new Group();
-		var groupData = this.groupData = [];
+		var groups = this.groups = [];
 		var pathA, pathB, paths;
 
 		for (var i = 0, il = sources.length - 1; i < il; i ++) {
@@ -45,16 +52,14 @@ Offsetter.prototype = {
 				paths.addChild(new Path());
 			}
 
-			groups.addChild(paths);
-			groupData.push({
+			items.addChild(paths);
+			groups.push({
 				a: pathA,
 				b: pathB,
 				pairs: null,
 				paths: paths
 			});
 		}
-
-		this.groups.style = this.style;
 	},
 
 	// Compare two paths, pairing their segments by proximity
@@ -148,9 +153,9 @@ Offsetter.prototype = {
 	},
 
 	update: function () {
-		var groupData = this.groupData;
-		for (var i = 0, il = groupData.length; i < il; i ++) {
-			this.updateGroup(groupData[i]);
+		var groups = this.groups;
+		for (var i = 0, il = groups.length; i < il; i ++) {
+			this.updateGroup(groups[i]);
 		}
 	},
 
@@ -190,9 +195,7 @@ Offsetter.prototype = {
 	},
 
 	resize: function (event) {
-		var size = view.size;
-		this.sources.fitBounds(size);
-		this.groups.fitBounds(size);
+		this.items.fitBounds(view.size);
 	}
 
 };
@@ -204,6 +207,7 @@ var paths = [
 	new Path([
 		[0.05, 0.05],
 		[0.12, 0.5],
+		[0.01, 0.75],
 		[0.1, 0.95]
 	]),
 
@@ -211,10 +215,18 @@ var paths = [
 		[0.25, 0.05],
 		[0.22, 0.5],
 		[0.21, 0.95]
+	]),
+
+	new Path([
+		[0.45, 0.05],
+		[0.52, 0.15],
+		[0.48, 0.25],
+		[0.62, 0.35],
+		[0.41, 0.95]
 	])
 ];
 
-var offsets = new Offsetter(paths, 20);
+var offsets = new Offsetter(paths, 20, true);
 
 
 

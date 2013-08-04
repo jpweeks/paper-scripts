@@ -38,7 +38,6 @@ Offsetter.prototype = {
 	setupGroups: function () {
 		var items = this.items;
 		var sources = this.sources.children;
-		var iterations = this.iterations;
 
 		var groups = this.groups = [];
 		var pathA, pathB, paths, data;
@@ -47,11 +46,6 @@ Offsetter.prototype = {
 			pathA = sources[i];
 			pathB = sources[i + 1];
 			paths = new Group();
-
-
-			for (var j = 0; j < iterations; j ++) {
-				paths.addChild(new Path());
-			}
 
 			data = {
 				a: pathA,
@@ -87,12 +81,16 @@ Offsetter.prototype = {
 			return match;
 		};
 
+		var comparator = function (a, b) {
+			return (a[0].index + a[1].index) - (b[0].index + b[1].index);
+		};
+
 		return function (pathA, pathB) {
 			var segmentsA = pathA.segments;
 			var segmentsB = pathB.segments;
 
 			var index = {};
-			var results = [];
+			var pairs = [];
 			var seg, match, slug;
 
 			for (var a = 0, al = segmentsA.length; a < al; a ++) {
@@ -100,7 +98,7 @@ Offsetter.prototype = {
 				match = closestSegment(seg, segmentsB);
 
 				index[a + "-" + match.index] = true;
-				results.push([seg, match]);
+				pairs.push([seg, match]);
 			}
 
 			for (var b = 0, bl = segmentsB.length; b < bl; b ++) {
@@ -110,21 +108,10 @@ Offsetter.prototype = {
 
 				if (!index[slug]) {
 					index[slug] = true;
-					results.push([match, seg]);
+					pairs.push([match, seg]);
 				}
 			}
 
-			this.sortPairs(results);
-			return results;
-		};
-	}()),
-
-	sortPairs: (function () {
-		var comparator = function (a, b) {
-			return (a[0].index + a[1].index) - (b[0].index + b[1].index);
-		};
-
-		return function (pairs) {
 			return pairs.sort(comparator);
 		};
 	}()),
@@ -132,30 +119,53 @@ Offsetter.prototype = {
 	updateGroup: function (group) {
 		if (!group) { return; }
 
-		var iterations = this.iterations;
-		var paths = group.paths.children;
-
+		var pathGroup = group.paths;
+		var paths = pathGroup.children;
 		var pairs = group.pairs = this.pairSegments(group.a, group.b);
-		var segments, pair;
-		var p0, p1, diff;
+		var iterations = this.iterations;
 
-		for (var i = 0, il = paths.length; i < il; i ++) {
-			paths[i].removeSegments();
+		var iterationsDiff = (group._iterations || 0) - iterations;
+		var pairsDiff = (group._pairsLength || 0) - pairs.length;
+
+		var pair, path, segs, seg;
+		var p0, p1, diff;
+		var i, il, j;
+
+		if (iterationsDiff > 0) {
+			pathGroup.removeChildren(paths.length - iterationsDiff, paths.length);
 		}
 
-		for (var j = 0, jl = pairs.length; j < jl; j ++) {
-			pair = pairs[j];
+		if (pairsDiff > 0) {
+			for (i = 0; i < iterations; i ++) {
+				path = paths[i];
+				segs = path.segments;
+				path.removeSegments(segs.length - pairsDiff, segs.length);
+			}
+		}
+
+		for (i = 0, il = pairs.length; i < il; i ++) {
+			pair = pairs[i];
 			p0 = pair[0].point;
 			p1 = pair[1].point;
 
 			diff = (p1 - p0) / (iterations + 1);
 
-			for (c = 0; c < iterations; c ++) {
-				paths[c].add(p0 + diff * (c + 1));
+			for (j = 0; j < iterations; j ++) {
+				path = paths[j];
+				if (!path) {
+					path = pathGroup.addChild(new Path());
+					path.style = this.style;
+				}
+
+				seg = path.segments[i] || path.add(new Point());
+				seg.point = p0 + diff * (j + 1);
 			}
 		}
 
-		return paths;
+		group._iterations = iterations;
+		group._pairsLength = pairs.length;
+
+		return pathGroup;
 	},
 
 	update: function () {

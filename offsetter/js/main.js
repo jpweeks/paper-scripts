@@ -6,7 +6,7 @@ var Offsetter = function (sources, opts) {
 	this.sources = new Group(sources);
 	this.items = new Group(this.sources);
 
-	this.sources.selected = true;
+	this.sources.fullySelected = true;
 	this.iterations = opts.iterations;
 
 	this.setupGroups();
@@ -57,6 +57,8 @@ Offsetter.prototype = {
 			items.addChild(paths);
 			pathA.groupB = pathB.groupA = data;
 			groups.push(data);
+
+			pathA.smooth();
 		}
 	},
 
@@ -82,7 +84,18 @@ Offsetter.prototype = {
 		};
 
 		var comparator = function (a, b) {
-			return (a[0].index + a[1].index) - (b[0].index + b[1].index);
+			return (a.a.index + a.b.index) - (b.a.index + b.b.index);
+		};
+
+		var indexPair = function (a, b, index) {
+			var sa = "a" + a;
+			var sb = "b" + b;
+
+			index[a + "-" + b] = true;
+		};
+
+		var isIndexed = function (a, b, index) {
+			return !!index[a + "-" + b];
 		};
 
 		return function (pathA, pathB) {
@@ -91,24 +104,24 @@ Offsetter.prototype = {
 
 			var index = {};
 			var pairs = [];
-			var seg, match, slug;
+			var seg, match, pair, sa, sb;
+			var i, il;
 
-			for (var a = 0, al = segmentsA.length; a < al; a ++) {
-				seg = segmentsA[a];
+			for (i = 0, il = segmentsA.length; i < il; i ++) {
+				seg = segmentsA[i];
 				match = closestSegment(seg, segmentsB);
 
-				index[a + "-" + match.index] = true;
-				pairs.push([seg, match]);
+				indexPair(i, match.index, index);
+				pairs.push({a: seg, b: match});
 			}
 
-			for (var b = 0, bl = segmentsB.length; b < bl; b ++) {
-				seg = segmentsB[b];
+			for (i = 0, il = segmentsB.length; i < il; i ++) {
+				seg = segmentsB[i];
 				match = closestSegment(seg, segmentsA);
-				slug = match.index + "-" + b;
 
-				if (!index[slug]) {
-					index[slug] = true;
-					pairs.push([match, seg]);
+				if (!isIndexed(match.index, i, index)) {
+					indexPair(match.index, i, index);
+					pairs.push({a: match, b: seg});
 				}
 			}
 
@@ -116,57 +129,103 @@ Offsetter.prototype = {
 		};
 	}()),
 
-	updateGroup: function (group) {
-		if (!group) { return; }
+	updateGroup: (function () {
+		var getOffset = function (p0, p1, iterations) {
+			return (p1 - p0) / (iterations + 1);
+		};
 
-		var pathGroup = group.paths;
-		var paths = pathGroup.children;
-		var pairs = group.pairs = this.pairSegments(group.a, group.b);
-		var iterations = this.iterations;
+		return function (group) {
+			if (!group) { return; }
 
-		var iterationsDiff = (group._iterations || 0) - iterations;
-		var pairsDiff = (group._pairsLength || 0) - pairs.length;
+			var pathGroup = group.paths;
+			var paths = pathGroup.children;
+			var pairs = group.pairs = this.pairSegments(group.a, group.b);
+			var iterations = this.iterations;
 
-		var pair, path, segs, seg;
-		var p0, p1, diff;
-		var i, il, j;
+			var iterationsDiff = (group._iterations || 0) - iterations;
+			var pairsDiff = (group._pairsLength || 0) - pairs.length;
 
-		if (iterationsDiff > 0) {
-			pathGroup.removeChildren(paths.length - iterationsDiff, paths.length);
-		}
+			var pair, path, segs, seg;
+			var handleA, handleB, offset, step;
+			var i, il, j, jl, s0, s1;
 
-		if (pairsDiff > 0) {
-			for (i = 0; i < iterations; i ++) {
+			// Remove unused paths
+			if (iterationsDiff > 0) {
+				pathGroup.removeChildren(paths.length - iterationsDiff, paths.length);
+			}
+
+			// Remove stray path segments
+			if (pairsDiff > 0) {
+				for (i = 0; i < iterations; i ++) {
+					path = paths[i];
+					segs = path.segments;
+					path.removeSegments(segs.length - pairsDiff, segs.length);
+				}
+			}
+
+			// Generate offset segments
+			for (i = 0, il = pairs.length; i < il; i ++) {
+				pair = pairs[i];
+				s0 = pair.a;
+				s1 = pair.b;
+
+				offsetPoint = getOffset(s0.point, s1.point, iterations);
+				offsetHandleIn = getOffset(s0.handleIn, s1.handleIn, iterations);
+				offsetHandleOut = getOffset(s0.handleOut, s1.handleOut, iterations);
+
+				for (j = 0; j < iterations; j ++) {
+					path = paths[j];
+
+					if (!path) {
+						path = pathGroup.addChild(new Path());
+						path.style = this.style;
+					}
+
+					step = j + 1;
+					seg = path.segments[i] || path.add(new Point());
+					seg.point = s0.point + offsetPoint * step;
+					seg.handleIn = s0.handleIn + offsetHandleIn * step;
+					seg.handleOut = s0.handleOut + offsetHandleOut * step;
+				}
+			}
+
+			// Clamp generated path control points to prevent kinkiness
+			this.smoothPaths(paths);
+
+			group._iterations = iterations;
+			group._pairsLength = pairs.length;
+
+			return pathGroup;
+		};
+	}()),
+
+	smoothPaths: (function () {
+		var clampify = function (seg0, seg1, handleType) {
+			if (!seg1) { return; }
+
+			var len = (seg0.point - seg1.point).length;
+			var handle = seg0[handleType];
+
+			if (handle.length > len) {
+				handle.length = len;
+			}
+		};
+
+		return function (paths) {
+			var path, segs, seg;
+
+			for (var i = 0, il = paths.length; i < il; i ++) {
 				path = paths[i];
 				segs = path.segments;
-				path.removeSegments(segs.length - pairsDiff, segs.length);
-			}
-		}
 
-		for (i = 0, il = pairs.length; i < il; i ++) {
-			pair = pairs[i];
-			p0 = pair[0].point;
-			p1 = pair[1].point;
-
-			diff = (p1 - p0) / (iterations + 1);
-
-			for (j = 0; j < iterations; j ++) {
-				path = paths[j];
-				if (!path) {
-					path = pathGroup.addChild(new Path());
-					path.style = this.style;
+				for (var j = 0, jl = segs.length; j < jl; j ++) {
+					seg = segs[j];
+					clampify(seg, segs[j - 1], "handleIn");
+					clampify(seg, segs[j + 1], "handleOut");
 				}
-
-				seg = path.segments[i] || path.add(new Point());
-				seg.point = p0 + diff * (j + 1);
 			}
-		}
-
-		group._iterations = iterations;
-		group._pairsLength = pairs.length;
-
-		return pathGroup;
-	},
+		};
+	}()),
 
 	update: function () {
 		var groups = this.groups;
